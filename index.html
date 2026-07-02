@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate Physics Sandbox</title>
+    <!-- Favicon from Web URL -->
+    <link rel="icon" type="image/png" href="icon.png" />
+    <style>
+        /* CSS Variables for Theming */
+        :root {
+            --app-bg: #000000;
+            --canvas-bg: #0a0a0a;
+            --panel-bg: #111111;
+            --text-color: #e0e0e0;
+            --accent: #ff3366;
+            --header-bg: #050505;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--app-bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            transition: background-color 0.4s ease;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            background-color: var(--header-bg);
+            padding: 12px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            z-index: 10;
+            transition: background-color 0.4s ease;
+        }
+
+        .hamburger {
+            font-size: 26px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            margin-right: 15px;
+            padding: 0 10px 0 0;
+            transition: color 0.3s;
+        }
+        
+        .hamburger:hover { color: var(--accent); }
+
+        .header h2 { margin: 0; font-size: 20px; flex-grow: 1; font-weight: 700; letter-spacing: 0.5px; }
+        .hint { font-size: 13px; color: var(--accent); font-weight: bold; background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 12px; }
+
+        .canvas-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            background-color: var(--app-bg);
+        }
+
+        canvas {
+            background-color: var(--canvas-bg);
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none; 
+            cursor: grab;
+            transition: background-color 0.4s ease;
+        }
+        canvas:active { cursor: grabbing; }
+
+        /* Enhanced Hit Counter Overlay */
+        .hit-counter {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            pointer-events: none;
+            border: 2px solid var(--accent);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            transition: transform 0.1s ease;
+        }
+
+        /* Sidebar Settings Panel */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -340px;
+            width: 320px;
+            height: 100%;
+            background: var(--panel-bg);
+            box-shadow: 10px 0 30px rgba(0,0,0,0.8);
+            transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), background-color 0.4s ease;
+            z-index: 100;
+            overflow-y: auto;
+            padding: 25px 20px;
+            box-sizing: border-box;
+            color: var(--text-color);
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent) var(--panel-bg);
+        }
+        
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-thumb { background-color: var(--accent); border-radius: 3px; }
+
+        .sidebar.open { left: 0; }
+
+        .close-btn {
+            text-align: right; font-size: 24px; cursor: pointer;
+            margin-bottom: 10px; color: var(--accent); font-weight: bold;
+            transition: transform 0.2s;
+        }
+        .close-btn:hover { transform: scale(1.2); }
+
+        .section-title {
+            color: var(--accent);
+            margin-top: 25px; margin-bottom: 15px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 2px solid rgba(255,255,255,0.05); padding-bottom: 8px; font-weight: 800;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+
+        .control-group { display: flex; flex-direction: column; margin-bottom: 15px; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        
+        label { font-size: 13px; margin-bottom: 6px; font-weight: 600; color: rgba(255,255,255,0.85); display: flex; justify-content: space-between; }
+        label span { color: var(--accent); font-weight: bold; }
+        
+        select, input[type=range] {
+            width: 100%; padding: 8px 10px; border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: var(--text-color);
+            font-size: 14px; outline: none; cursor: pointer;
+        }
+        select option { background: #222; color: #fff; }
+
+        input[type=range] { -webkit-appearance: none; padding: 0; height: 6px; background: rgba(255,255,255,0.1); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; }
+
+        input[type="color"] {
+            -webkit-appearance: none; border: none; width: 36px; height: 36px;
+            border-radius: 50%; cursor: pointer; padding: 0; background: none;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; }
+
+        /* Custom Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; margin-bottom: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.2); transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        button.action-btn {
+            width: 100%; padding: 14px; margin-top: 25px; margin-bottom: 20px; font-size: 15px;
+            background-color: var(--accent); color: #fff; text-transform: uppercase; letter-spacing: 1px;
+            border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: transform 0.2s, background-color 0.2s;
+        }
+        button.action-btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        button.action-btn:active { transform: translateY(0); }
+
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(2px);
+            z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+        }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <button class="hamburger" onclick="toggleMenu()">☰</button>
+        <h2>Physics Sandbox</h2>
+        <span class="hint">👆 Drag & Throw</span>
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="simCanvas"></canvas>
+        <div class="hit-counter" id="hitContainer">Hits: <span id="hitDisplay">0</span></div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+
+    <!-- Sidebar Settings -->
+    <div class="sidebar" id="sidebar">
+        <div class="close-btn" onclick="toggleMenu()">✖</div>
+
+        <div class="section-title">🎨 Appearance</div>
+        <div class="control-group">
+            <label>App Theme</label>
+            <select id="themeSelect" onchange="applyTheme()">
+                <option value="dark">🌑 Pure Dark (Default)</option>
+                <option value="neon">🟣 Cyberpunk Neon</option>
+                <option value="sunset">🌅 Sunset Vibes</option>
+                <option value="ocean">🌊 Deep Ocean</option>
+                <option value="monokai">🎨 Monokai Retro</option>
+                <option value="cool">❄️ Bright Light</option>
+            </select>
+        </div>
+        <div class="control-row">
+            <label>Motion Trail</label>
+            <label class="switch">
+              <input type="checkbox" id="trailToggle" checked>
+              <span class="slider"></span>
+            </label>
+        </div>
+        <div class="control-row">
+            <label style="margin-bottom:0;">Ball Color:</label>
+            <input type="color" id="ballColorPicker" onchange="customBallColor()">
+        </div>
+        <div class="control-row">
+            <label style="margin-bottom:0;">Canvas BG:</label>
+            <input type="color" id="bgColorPicker" onchange="customBgColor()">
+        </div>
+
+        <div class="section-title">🌍 Physics Presets</div>
+        <div class="control-group">
+            <label>Environment Gravity</label>
+            <select id="planetSelect" onchange="applyPlanet()">
+                <option value="9.8">🌍 Earth (9.8 m/s²)</option>
+                <option value="1.6">🌕 Moon (1.6 m/s²)</option>
+                <option value="3.7">🔴 Mars (3.7 m/s²)</option>
+                <option value="24.8">🪐 Jupiter (24.8 m/s²)</option>
+                <option value="100">🕳️ Black Hole (100 m/s²)</option>
+                <option value="0">🌌 Deep Space (0 m/s²)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Fun Objects</label>
+            <select id="materialSelect" onchange="applyMaterial()">
+                <option value="rubber">🔴 Rubber Ball (Normal)</option>
+                <option value="bowling">⚫ Bowling Ball (Heavy)</option>
+                <option value="feather">☁️ Feather (High drag)</option>
+                <option value="balloon">🎈 Helium Balloon (Floats!)</option>
+                <option value="flubber">🟢 Flubber (Bounces higher!)</option>
+                <option value="ice">🧊 Ice Block (Slides forever)</option>
+            </select>
+        </div>
+
+        <div class="section-title">⚙️ Environment Engine</div>
+        <div class="control-group">
+            <label>Wind Force <span id="windVal">0</span></label>
+            <input type="range" id="wind" min="-10" max="10" step="0.5" value="0">
+        </div>
+        <div class="control-group">
+            <label>Air Resistance <span id="airResVal">1%</span></label>
+            <input type="range" id="airRes" min="0" max="20" step="1" value="1">
+        </div>
+        <div class="control-group">
+            <label>Surface Friction <span id="frictionUIVal">50%</span></label>
+            <input type="range" id="friction" min="0" max="100" step="1" value="50">
+        </div>
+
+        <div class="section-title">🎾 Ball Engine</div>
+        <div class="control-group">
+            <label>Gravity Pull <span id="gravVal">9.8</span></label>
+            <input type="range" id="gravity" min="0" max="100" step="0.1" value="9.8">
+        </div>
+        <div class="control-group">
+            <label>Mass & Size <span id="massVal">1 kg</span></label>
+            <input type="range" id="mass" min="0.5" max="20" step="0.5" value="1">
+        </div>
+        <div class="control-group">
+            <label>Bounciness <span id="bounceVal">80%</span></label>
+            <input type="range" id="bounciness" min="0" max="1.5" step="0.05" value="0.8">
+        </div>
+
+        <button class="action-btn" onclick="resetBall(); toggleMenu();">Drop & Reset</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("simCanvas");
+        const ctx = canvas.getContext("2d");
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        const hitDisplay = document.getElementById("hitDisplay");
+        const hitContainer = document.getElementById("hitContainer");
+        
+        let hitCount = 0;
+        let trail = [];
+
+        // Materials trigger specific slider settings
+        const materials = {
+            rubber:  { mass: 2, bounce: 0.8, air: 1, friction: 50, gravDir: 1, color: "#e74c3c" },
+            bowling: { mass: 15, bounce: 0.2, air: 0, friction: 80, gravDir: 1, color: "#2c3e50" },
+            feather: { mass: 0.5, bounce: 0.1, air: 15, friction: 60, gravDir: 1, color: "#ffffff" },
+            balloon: { mass: 1.5, bounce: 0.5, air: 5, friction: 50, gravDir: -0.5, color: "#e1b12c" }, 
+            flubber: { mass: 2, bounce: 1.15, air: 0, friction: 10, gravDir: 1, color: "#2ecc71" }, 
+            ice:     { mass: 3, bounce: 0.3, air: 0, friction: 0, gravDir: 1, color: "#74b9ff" } 
+        };
+
+        // Custom Themes
+        const themes = {
+            dark:    { appBg: '#000000', canvasBg: '#0a0a0a', panelBg: '#111111', text: '#e0e0e0', accent: '#ff3366', headerBg: '#050505' },
+            neon:    { appBg: '#0b0c10', canvasBg: '#1f2833', panelBg: '#0b0c10', text: '#66fcf1', accent: '#45a29e', headerBg: '#111318' },
+            sunset:  { appBg: '#2b1029', canvasBg: '#471c3b', panelBg: '#2b1029', text: '#f8e9a1', accent: '#f26d5b', headerBg: '#1f0a1d' },
+            ocean:   { appBg: '#011214', canvasBg: '#002f35', panelBg: '#011a1c', text: '#e0f7fa', accent: '#4db6ac', headerBg: '#000c0d' },
+            monokai: { appBg: '#272822', canvasBg: '#3e3d32', panelBg: '#272822', text: '#f8f8f2', accent: '#a6e22e', headerBg: '#1e1f1c' },
+            cool:    { appBg: '#e0f7fa', canvasBg: '#ffffff', panelBg: '#b2ebf2', text: '#212121', accent: '#0097a7', headerBg: '#80deea' }
+        };
+
+        let ball = {
+            x: canvas.width / 2, y: canvas.height / 2,
+            vx: 0, vy: 0, radius: 20, 
+            color: "#e74c3c", gravDir: 1
+        };
+
+        let isDragging = false;
+        let lastPositions = [];
+
+        function toggleMenu() {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+
+        function applyTheme() {
+            let t = themes[document.getElementById("themeSelect").value];
+            let root = document.documentElement;
+            root.style.setProperty('--app-bg', t.appBg);
+            root.style.setProperty('--canvas-bg', t.canvasBg);
+            root.style.setProperty('--panel-bg', t.panelBg);
+            root.style.setProperty('--text-color', t.text);
+            root.style.setProperty('--accent', t.accent);
+            root.style.setProperty('--header-bg', t.headerBg);
+            document.getElementById("bgColorPicker").value = t.canvasBg;
+        }
+
+        function customBallColor() { ball.color = document.getElementById("ballColorPicker").value; }
+        function customBgColor() { document.documentElement.style.setProperty('--canvas-bg', document.getElementById("bgColorPicker").value); }
+
+        function applyPlanet() {
+            document.getElementById("gravity").value = document.getElementById("planetSelect").value;
+        }
+
+        function applyMaterial() {
+            let mat = materials[document.getElementById("materialSelect").value];
+            document.getElementById("mass").value = mat.mass;
+            document.getElementById("bounciness").value = mat.bounce;
+            document.getElementById("airRes").value = mat.air;
+            document.getElementById("friction").value = mat.friction;
+            ball.gravDir = mat.gravDir;
+            ball.color = mat.color;
+            document.getElementById("ballColorPicker").value = mat.color;
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = ball.gravDir > 0 ? 50 : canvas.height - 50;
+            ball.vy = 0; ball.vx = 0;
+            hitCount = 0;
+            trail = [];
+            hitDisplay.innerText = hitCount;
+        }
+
+        function registerHit(impactSpeed) {
+            if (Math.abs(impactSpeed) > 2.0) {
+                hitCount++;
+                hitDisplay.innerText = hitCount;
+                hitContainer.style.transform = "scale(1.2)";
+                setTimeout(() => hitContainer.style.transform = "scale(1)", 150);
+            }
+        }
+
+        function updatePhysics() {
+            // Read all sliders
+            let gravity = parseFloat(document.getElementById("gravity").value);
+            let mass = parseFloat(document.getElementById("mass").value);
+            let bounceFactor = parseFloat(document.getElementById("bounciness").value);
+            let windVal = parseFloat(document.getElementById("wind").value);
+            let airVal = parseFloat(document.getElementById("airRes").value);
+            let frictionVal = parseFloat(document.getElementById("friction").value);
+            
+            // Update UI text
+            document.getElementById("gravVal").innerText = gravity;
+            document.getElementById("massVal").innerText = mass + " kg";
+            document.getElementById("bounceVal").innerText = Math.round(bounceFactor * 100) + "%";
+            document.getElementById("windVal").innerText = windVal;
+            document.getElementById("airResVal").innerText = airVal + "%";
+            document.getElementById("frictionUIVal").innerText = frictionVal + "%";
+
+            // Physics Mapping
+            ball.radius = 10 + (mass * 3); 
+            let airMultiplier = 1.0 - (airVal / 200); 
+            let frictionMultiplier = 1.0 - (frictionVal / 500); 
+
+            // Clamp positions just in case physics break
+            ball.x = Math.max(ball.radius, Math.min(canvas.width - ball.radius, ball.x));
+            ball.y = Math.max(ball.radius, Math.min(canvas.height - ball.radius, ball.y));
+
+            if (isDragging) return;
+
+            // Apply Forces
+            let gravityScale = gravity * 0.04 * ball.gravDir; 
+            ball.vy += gravityScale; 
+            ball.vx += windVal * 0.015; // Wind
+
+            // Apply Air Drag
+            ball.vx *= airMultiplier;
+            ball.vy *= airMultiplier;
+
+            // Speed Limit for safety (prevents clipping)
+            ball.vx = Math.max(-80, Math.min(80, ball.vx));
+            ball.vy = Math.max(-80, Math.min(80, ball.vy));
+
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // --- Collisions Logic ---
+            let sleepThreshold = Math.abs(gravityScale * 2.5) + 0.5;
+
+            // Floor Collision
+            if (ball.y + ball.radius >= canvas.height && ball.vy > 0) {
+                ball.y = canvas.height - ball.radius;
+                registerHit(ball.vy);
+                if (Math.abs(ball.vy) < sleepThreshold) {
+                    ball.vy = 0; 
+                    ball.vx *= frictionMultiplier; 
+                } else {
+                    ball.vy = -ball.vy * bounceFactor; 
+                }
+            }
+
+            // Ceiling Collision (For Balloons)
+            if (ball.y - ball.radius <= 0 && ball.vy < 0) {
+                ball.y = ball.radius;
+                registerHit(ball.vy);
+                if (Math.abs(ball.vy) < sleepThreshold) {
+                    ball.vy = 0;
+                    ball.vx *= frictionMultiplier; 
+                } else {
+                    ball.vy = -ball.vy * bounceFactor;
+                }
+            }
+
+            // Right Wall
+            if (ball.x + ball.radius >= canvas.width && ball.vx > 0) {
+                ball.x = canvas.width - ball.radius;
+                registerHit(ball.vx);
+                ball.vx = -ball.vx * bounceFactor;
+            } 
+            // Left Wall
+            else if (ball.x - ball.radius <= 0 && ball.vx < 0) {
+                ball.x = ball.radius;
+                registerHit(ball.vx);
+                ball.vx = -ball.vx * bounceFactor;
+            }
+        }
+
+        function updateTrail() {
+            if (document.getElementById("trailToggle").checked) {
+                trail.push({ x: ball.x, y: ball.y, r: ball.radius, color: ball.color });
+                if (trail.length > 25) trail.shift();
+            } else {
+                trail = [];
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Trail
+            if (trail.length > 0) {
+                for (let i = 0; i < trail.length - 1; i++) {
+                    let t = trail[i];
+                    let alpha = (i / trail.length) * 0.4;
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, t.r * (i / trail.length), 0, Math.PI * 2);
+                    ctx.fillStyle = t.color;
+                    ctx.globalAlpha = alpha;
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Draw Shadow Fix (Adapts to gravity direction and height)
+            if (Math.abs(ball.vy) >= 0 || isDragging) { 
+                let isBalloon = ball.gravDir < 0;
+                let distanceToSurface = isBalloon ? (ball.y - ball.radius) : (canvas.height - (ball.y + ball.radius));
+                let maxShadowDist = ball.radius * 7; 
+                
+                if (distanceToSurface < maxShadowDist) {
+                    let shadowScale = Math.max(0, 1 - (distanceToSurface / maxShadowDist));
+                    let shadowW = ball.radius * shadowScale;
+                    let shadowH = ball.radius * 0.25 * shadowScale;
+                    let shadowY = isBalloon ? shadowH : canvas.height - shadowH;
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(ball.x, shadowY, shadowW, shadowH, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * shadowScale})`;
+                    ctx.fill();
+                }
+            }
+
+            // High Quality 3D Ball Rendering
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            
+            // 3D Gradient Shading
+            let grad = ctx.createRadialGradient(
+                ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, ball.radius * 0.05,
+                ball.x, ball.y, ball.radius
+            );
+            grad.addColorStop(0, "rgba(255, 255, 255, 0.7)");
+            grad.addColorStop(0.3, "rgba(255, 255, 255, 0.1)");
+            grad.addColorStop(0.7, "rgba(0, 0, 0, 0.2)");
+            grad.addColorStop(1, "rgba(0, 0, 0, 0.6)");
+            
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Rim outline for white/bright objects
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.stroke();
+        }
+
+        function loop() {
+            updatePhysics();
+            updateTrail();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Improved Throwing Mechanics ---
+        function getPointerPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            }
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function startDrag(e) {
+            const pos = getPointerPos(e);
+            const dx = pos.x - ball.x;
+            const dy = pos.y - ball.y;
+            
+            // Allow grabbing slightly outside the ball for mobile ease
+            if (Math.sqrt(dx * dx + dy * dy) <= ball.radius + 30) {
+                isDragging = true;
+                ball.vx = 0; ball.vy = 0;
+                lastPositions = [{x: ball.x, y: ball.y, time: Date.now()}];
+            }
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault(); 
+            
+            const pos = getPointerPos(e);
+            ball.x = Math.max(ball.radius, Math.min(canvas.width - ball.radius, pos.x));
+            ball.y = Math.max(ball.radius, Math.min(canvas.height - ball.radius, pos.y));
+
+            // Track positions to calculate throw velocity
+            lastPositions.push({x: ball.x, y: ball.y, time: Date.now()});
+            if (lastPositions.length > 5) lastPositions.shift();
+        }
+
+        function endDrag() { 
+            if (!isDragging) return;
+            isDragging = false; 
+            
+            if (lastPositions.length > 1) {
+                let first = lastPositions[0];
+                let last = lastPositions[lastPositions.length - 1];
+                let dt = (last.time - first.time) || 16;
+                
+                // Calculate momentum multiplier
+                ball.vx = ((last.x - first.x) / dt) * 20; 
+                ball.vy = ((last.y - first.y) / dt) * 20;
+            }
+            lastPositions = [];
+        }
+
+        canvas.addEventListener("mousedown", startDrag);
+        window.addEventListener("mousemove", drag);
+        window.addEventListener("mouseup", endDrag);
+
+        canvas.addEventListener("touchstart", startDrag, {passive: false});
+        window.addEventListener("touchmove", drag, {passive: false});
+        window.addEventListener("touchend", endDrag);
+
+        // Init
+        applyTheme();
+        applyPlanet();
+        applyMaterial();
+        loop();
+    </script>
+</body>
+</html>
