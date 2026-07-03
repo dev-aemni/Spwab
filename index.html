@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <meta property="og:title" content="Spwab" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta property="og:title" content="Spwab" />
     <meta property="og:description" content="Stimulate Physics With A Ball" />
     <meta property="og:image" content="https://dev-aemni.github.io/Spwab/icon.png" />
     <meta property="og:type" content="website" />
@@ -12,7 +12,6 @@
     <meta name="twitter:title" content="Spwab" />
     <meta name="twitter:description" content="Stimulate Physics With A Ball\n-# open it and click on the hambargger menu!" />
     <meta name="twitter:image" content="https://dev-aemni.github.io/Spwab/icon.png" />
-    
     
     <title>Spwab</title>
     <link rel="icon" type="image/png" href="icon.png" />
@@ -28,16 +27,24 @@
             --header-bg: #050505;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--app-bg);
-            color: var(--text-color);
+        html, body {
             margin: 0;
             padding: 0;
+            width: 100%;
+            /* Fix for mobile 100vh issue: */
+            height: 100%;
+            height: 100dvh; 
             overflow: hidden;
+            position: fixed; /* Locks viewport, prevents bouncing & scrolling under OS nav */
+            background-color: var(--app-bg);
+            touch-action: none; /* Prevents whole-page pull-to-refresh */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-color);
             display: flex;
             flex-direction: column;
-            height: 100vh;
             transition: background-color 0.4s ease;
         }
         
@@ -46,9 +53,12 @@
             align-items: center;
             background-color: var(--header-bg);
             padding: 12px 20px;
+            /* For iPhones/devices with notches */
+            padding-top: max(12px, env(safe-area-inset-top)); 
             box-shadow: 0 4px 15px rgba(0,0,0,0.8);
             z-index: 10;
             transition: background-color 0.4s ease;
+            flex-shrink: 0;
         }
 
         .hamburger {
@@ -72,6 +82,7 @@
             flex-grow: 1;
             width: 100%;
             background-color: var(--app-bg);
+            overflow: hidden;
         }
 
         canvas {
@@ -116,6 +127,8 @@
             z-index: 100;
             overflow-y: auto;
             padding: 25px 20px;
+            /* Account for bottom nav safe areas */
+            padding-bottom: max(25px, env(safe-area-inset-bottom));
             box-sizing: border-box;
             color: var(--text-color);
             scrollbar-width: thin;
@@ -295,12 +308,23 @@
         const canvas = document.getElementById("simCanvas");
         const ctx = canvas.getContext("2d");
 
+        // Fixed Mobile Resize Function
         function resizeCanvas() {
+            // JS fallback to strictly enforce inner browser height (prevents nav bar hiding canvas)
+            document.body.style.height = window.innerHeight + 'px';
+            
             canvas.width = canvas.parentElement.clientWidth;
             canvas.height = canvas.parentElement.clientHeight;
+
+            // Correction: If screen shrinks, push the ball back up into bounds so it doesn't get lost
+            if (typeof ball !== "undefined") {
+                if (ball.y + ball.radius > canvas.height) ball.y = canvas.height - ball.radius;
+                if (ball.x + ball.radius > canvas.width) ball.x = canvas.width - ball.radius;
+            }
         }
+        
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 150)); // Catch mobile rotations
 
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
@@ -310,7 +334,6 @@
         let hitCount = 0;
         let trail = [];
 
-        // Materials trigger specific slider settings
         const materials = {
             rubber:  { mass: 2, bounce: 0.8, air: 1, friction: 50, gravDir: 1, color: "#e74c3c" },
             bowling: { mass: 15, bounce: 0.2, air: 0, friction: 80, gravDir: 1, color: "#2c3e50" },
@@ -320,7 +343,6 @@
             ice:     { mass: 3, bounce: 0.3, air: 0, friction: 0, gravDir: 1, color: "#74b9ff" } 
         };
 
-        // Custom Themes
         const themes = {
             dark:    { appBg: '#000000', canvasBg: '#0a0a0a', panelBg: '#111111', text: '#e0e0e0', accent: '#ff3366', headerBg: '#050505' },
             neon:    { appBg: '#0b0c10', canvasBg: '#1f2833', panelBg: '#0b0c10', text: '#66fcf1', accent: '#45a29e', headerBg: '#111318' },
@@ -331,7 +353,7 @@
         };
 
         let ball = {
-            x: canvas.width / 2, y: canvas.height / 2,
+            x: 0, y: 0, 
             vx: 0, vy: 0, radius: 20, 
             color: "#e74c3c", gravDir: 1
         };
@@ -393,7 +415,6 @@
         }
 
         function updatePhysics() {
-            // Read all sliders
             let gravity = parseFloat(document.getElementById("gravity").value);
             let mass = parseFloat(document.getElementById("mass").value);
             let bounceFactor = parseFloat(document.getElementById("bounciness").value);
@@ -401,7 +422,6 @@
             let airVal = parseFloat(document.getElementById("airRes").value);
             let frictionVal = parseFloat(document.getElementById("friction").value);
             
-            // Update UI text
             document.getElementById("gravVal").innerText = gravity;
             document.getElementById("massVal").innerText = mass + " kg";
             document.getElementById("bounceVal").innerText = Math.round(bounceFactor * 100) + "%";
@@ -409,34 +429,29 @@
             document.getElementById("airResVal").innerText = airVal + "%";
             document.getElementById("frictionUIVal").innerText = frictionVal + "%";
 
-            // Physics Mapping
             ball.radius = 10 + (mass * 3); 
             let airMultiplier = 1.0 - (airVal / 200); 
             let frictionMultiplier = 1.0 - (frictionVal / 500); 
 
-            // Clamp positions just in case physics break
+            // Clamp positions to avoid breaking the bounds
             ball.x = Math.max(ball.radius, Math.min(canvas.width - ball.radius, ball.x));
             ball.y = Math.max(ball.radius, Math.min(canvas.height - ball.radius, ball.y));
 
             if (isDragging) return;
 
-            // Apply Forces
             let gravityScale = gravity * 0.04 * ball.gravDir; 
             ball.vy += gravityScale; 
-            ball.vx += windVal * 0.015; // Wind
+            ball.vx += windVal * 0.015; 
 
-            // Apply Air Drag
             ball.vx *= airMultiplier;
             ball.vy *= airMultiplier;
 
-            // Speed Limit for safety (prevents clipping)
             ball.vx = Math.max(-80, Math.min(80, ball.vx));
             ball.vy = Math.max(-80, Math.min(80, ball.vy));
 
             ball.x += ball.vx;
             ball.y += ball.vy;
 
-            // --- Collisions Logic ---
             let sleepThreshold = Math.abs(gravityScale * 2.5) + 0.5;
 
             // Floor Collision
@@ -451,7 +466,7 @@
                 }
             }
 
-            // Ceiling Collision (For Balloons)
+            // Ceiling Collision
             if (ball.y - ball.radius <= 0 && ball.vy < 0) {
                 ball.y = ball.radius;
                 registerHit(ball.vy);
@@ -463,14 +478,12 @@
                 }
             }
 
-            // Right Wall
+            // Walls Collision
             if (ball.x + ball.radius >= canvas.width && ball.vx > 0) {
                 ball.x = canvas.width - ball.radius;
                 registerHit(ball.vx);
                 ball.vx = -ball.vx * bounceFactor;
-            } 
-            // Left Wall
-            else if (ball.x - ball.radius <= 0 && ball.vx < 0) {
+            } else if (ball.x - ball.radius <= 0 && ball.vx < 0) {
                 ball.x = ball.radius;
                 registerHit(ball.vx);
                 ball.vx = -ball.vx * bounceFactor;
@@ -489,7 +502,6 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Trail
             if (trail.length > 0) {
                 for (let i = 0; i < trail.length - 1; i++) {
                     let t = trail[i];
@@ -503,7 +515,6 @@
                 ctx.globalAlpha = 1.0;
             }
 
-            // Draw Shadow Fix (Adapts to gravity direction and height)
             if (Math.abs(ball.vy) >= 0 || isDragging) { 
                 let isBalloon = ball.gravDir < 0;
                 let distanceToSurface = isBalloon ? (ball.y - ball.radius) : (canvas.height - (ball.y + ball.radius));
@@ -522,13 +533,11 @@
                 }
             }
 
-            // High Quality 3D Ball Rendering
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.fillStyle = ball.color;
             ctx.fill();
             
-            // 3D Gradient Shading
             let grad = ctx.createRadialGradient(
                 ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, ball.radius * 0.05,
                 ball.x, ball.y, ball.radius
@@ -541,7 +550,6 @@
             ctx.fillStyle = grad;
             ctx.fill();
 
-            // Rim outline for white/bright objects
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.lineWidth = 1;
@@ -556,7 +564,6 @@
             requestAnimationFrame(loop);
         }
 
-        // --- Improved Throwing Mechanics ---
         function getPointerPos(e) {
             const rect = canvas.getBoundingClientRect();
             let clientX = e.clientX;
@@ -577,7 +584,6 @@
             const dx = pos.x - ball.x;
             const dy = pos.y - ball.y;
             
-            // Allow grabbing slightly outside the ball for mobile ease
             if (Math.sqrt(dx * dx + dy * dy) <= ball.radius + 30) {
                 isDragging = true;
                 ball.vx = 0; ball.vy = 0;
@@ -593,7 +599,6 @@
             ball.x = Math.max(ball.radius, Math.min(canvas.width - ball.radius, pos.x));
             ball.y = Math.max(ball.radius, Math.min(canvas.height - ball.radius, pos.y));
 
-            // Track positions to calculate throw velocity
             lastPositions.push({x: ball.x, y: ball.y, time: Date.now()});
             if (lastPositions.length > 5) lastPositions.shift();
         }
@@ -607,7 +612,6 @@
                 let last = lastPositions[lastPositions.length - 1];
                 let dt = (last.time - first.time) || 16;
                 
-                // Calculate momentum multiplier
                 ball.vx = ((last.x - first.x) / dt) * 20; 
                 ball.vy = ((last.y - first.y) / dt) * 20;
             }
@@ -622,10 +626,12 @@
         window.addEventListener("touchmove", drag, {passive: false});
         window.addEventListener("touchend", endDrag);
 
-        // Init
+        // Initial setup sequence
+        resizeCanvas();
         applyTheme();
         applyPlanet();
         applyMaterial();
+        resetBall();
         loop();
     </script>
 </body>
